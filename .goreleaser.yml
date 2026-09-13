@@ -12,8 +12,9 @@ builds:
       - -X github.com/specsnl/specsdeployd/internal/cmd.Version={{ .Version }}
     env:
       - CGO_ENABLED=0
-    # Linux only: the Ansible role that installs this never targets anything else.
-    goos: [linux]
+    # The daemon only ever runs on Linux; darwin is here for the Homebrew cask,
+    # so a developer machine can run `specsdeployd version` against a release.
+    goos: [linux, darwin]
     goarch: [amd64, arm64]
 
 archives:
@@ -29,3 +30,36 @@ release:
     name: specsdeployd
   draft: false
   prerelease: auto
+
+nfpms:
+  - id: specsdeployd
+    ids: [specsdeployd]
+    package_name: specsdeployd
+    formats: [deb]
+    section: utils
+    vendor: Specsnl
+    homepage: "https://github.com/specsnl/specsdeployd"
+    maintainer: "Specsnl <info@specs.nl>"
+    description: "The deploy agent of the Specs golden images"
+    license: MIT
+
+homebrew_casks:
+  - &cask
+    name: specsdeployd@rc
+    binaries: [specsdeployd]
+    repository:
+      owner: specsnl
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/specsnl/specsdeployd"
+    description: "The deploy agent of the Specs golden images"
+    directory: Casks
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/specsdeployd"]
+          end
+  - <<: *cask
+    name: specsdeployd
+    skip_upload: auto
