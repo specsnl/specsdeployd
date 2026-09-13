@@ -1,0 +1,8 @@
+.env
+.DS_Store
+/dev
+Taskfile.yml
+.playwright-mcp
+
+/specsdeployd
+/dist/
