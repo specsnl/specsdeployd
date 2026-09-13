@@ -1,0 +1,31 @@
+version: 2
+
+builds:
+  - id: specsdeployd
+    main: .
+    binary: specsdeployd
+    flags:
+      - -trimpath
+      - -tags=netgo
+    ldflags:
+      - -s -w
+      - -X github.com/specsnl/specsdeployd/internal/cmd.Version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    # Linux only: the Ansible role that installs this never targets anything else.
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "specsdeployd_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: specsnl
+    name: specsdeployd
+  draft: false
+  prerelease: auto

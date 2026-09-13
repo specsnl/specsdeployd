@@ -1,0 +1,131 @@
+# https://taskfile.dev
+version: "3"
+
+includes:
+  md: ./taskfiles/Taskfile.md.yml
+  lint:
+    taskfile: ./taskfiles/Taskfile.lint.yml
+    flatten: true
+
+silent: true
+
+vars:
+  # The leading v is stripped to match goreleaser's {{ .Version }}. The fallback
+  # is captured before the strip, so an undescribable tree yields "dev" rather
+  # than an empty string.
+  SPECSDEPLOYD_VERSION:
+    sh: described=$(git describe --tags --always --dirty="-dev" 2>/dev/null || echo "dev"); echo "${described#v}"
+
+tasks:
+
+  dc:
+    desc: Run a docker compose command
+    internal: true
+    vars:
+      FIXUID:
+        sh: echo ${FIXUID:-$(id -u)}
+      FIXGID:
+        sh: echo ${FIXGID:-$(id -g)}
+    cmds:
+      - FIXUID={{ .FIXUID }} FIXGID={{ .FIXGID }} docker compose {{ .SUB_CMD }} {{ .CLI_ARGS }}
+
+  dc:build:
+    desc: Run docker compose build
+    cmds:
+      - task: dc
+        vars:
+          SUB_CMD: --profile=* build
+
+  dc:run:*:
+    desc: Run a one-off docker compose command
+    vars:
+      SERVICE: '{{ index .MATCH 0 }}'
+      RUN_FLAGS: '{{ .RUN_FLAGS | default "" }}'
+      USER_FLAG: '{{ (ne (.NON_ROOT | default "true") "false") | ternary " --user $(id -u):$(id -g)" "" }}'
+      COMPOSE_SERVICES:
+        sh: COMPOSE_PROFILES="*" docker compose config --services
+    cmds:
+      - task: dc
+        vars:
+          SUB_CMD: 'run --rm {{ .RUN_FLAGS }} {{ .USER_FLAG }} {{ .SERVICE }} {{ .SUB_CMD }}'
+          CLI_ARGS: '{{ .CLI_ARGS }}'
+    requires:
+      vars:
+        - name: SERVICE
+          enum:
+            ref: .COMPOSE_SERVICES | splitLines | compact
+
+  dc:shell:
+    desc: Shell into a docker compose service
+    cmds:
+      - task: dc
+        vars:
+          SUB_CMD: "run --tty --rm go-builder /bin/bash"
+          CLI_ARGS: "{{.CLI_ARGS}}"
+
+  build:
+    desc: Build specsdeployd into the working directory
+    cmds:
+      - task: lint
+      - >-
+        docker buildx bake --file compose.yml
+        --set "go-binary.output=type=local,dest=."
+        --set "go-binary.args.GOARCH={{ARCH}}"
+        --set "go-binary.args.GOOS={{OS}}"
+        --set "go-binary.args.SPECSDEPLOYD_VERSION={{.SPECSDEPLOYD_VERSION}}"
+        go-binary
+
+  tidy:check:
+    desc: Check that go.mod and go.sum are tidy
+    summary: |
+      Fails, without writing anything, when `go mod tidy` would change go.mod or go.sum.
+
+      Run `task tidy` to apply what it reports.
+    cmds:
+      - task: dc:run:go-builder
+        vars:
+          SUB_CMD: "go mod tidy -diff"
+
+  tidy:
+    desc: Run go mod tidy
+    cmds:
+      - task: dc:run:go-builder
+        vars:
+          SUB_CMD: "go mod tidy"
+
+  test:
+    desc: Run go tests
+    cmds:
+      - task: dc:run:go-builder
+        vars:
+          SUB_CMD: "go test -race -tags=integration ./..."
+
+  checkall:
+    desc: Run every check — the tidy check, golangci-lint, the Go tests, and markdownlint
+    summary: |
+      The full local check sequence: tidy:check, lint, test, md:check.
+
+      Every step reports; none of them writes. Run this before opening a pull request.
+    cmds:
+      - task: tidy:check
+      - task: lint
+      - task: test
+      - task: md:check
+
+  release:dry-run:
+    desc: Build a snapshot release locally without publishing
+    cmds:
+      - task: dc:run:goreleaser
+        vars:
+          SUB_CMD: release --snapshot --clean
+
+  cleanup:
+    desc: Cleanup workspace
+    summary: |
+      Cleanup of almost all gitignored files, untracked files and development containers.
+
+      The following files/dirs are excluded: none
+    cmds:
+      - git clean
+        -xd
+        --force
