@@ -23,7 +23,9 @@ Nothing in this list exists yet, and specsdeployd v0.2.0 cannot run without it.
       `Pull=never`, exactly as spike B2 wrote it
 - [ ] **`/etc/specsdeployd/config.json`:** from host vars, laid down with
       `validate: "specsdeployd config validate %s"`, and notifying a restart of `specsdeployd.service`
-- [ ] **`/etc/specsdeployd/secrets.age`:** copied as-is from the repository, still encrypted, and notifying the restart
+- [ ] **`/etc/specsdeployd/secrets.age`:** copied as-is from the repository, still encrypted, and notifying the restart.
+      The ciphertext is built off-host from the server's 1Password item, by OpenTofu (X3) or by an off-host playbook here, as spike B3
+      decides. The server itself never gets 1Password credentials
 - [ ] **Host identity,** per spike B1: generated on first run with its recipient published, or no step at all if the SSH host key is used.
       Document the new-host bootstrap order
 - [ ] **Registry credentials** for root, per spike B4

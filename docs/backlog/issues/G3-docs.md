@@ -25,6 +25,7 @@ never seen the daemon before: how to put it on a server, configure it, author it
 - [ ] `usage/configuration.md`: every field, its default, and what is rejected. Where possible, generate the tables from the schema and
       check them in a test
 - [ ] `usage/secrets.md`:
+      - the 1Password layout: one item per server, the shared App key, and the break-glass identity;
       - authoring with the `age` CLI;
       - the host and break-glass recipients;
       - the 1Password location of the break-glass identity and the App key;

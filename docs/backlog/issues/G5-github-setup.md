@@ -23,7 +23,8 @@ is tested by being used.
 
 - [ ] Create the App `specsdeployd` in `specsnl`, with Deployments read and write, Metadata read, and **no webhook**. Install it on the
       repositories that will be deployed first
-- [ ] Generate the App private key and store it in 1Password, next to the break-glass age identity
+- [ ] Generate the App private key and store it in its own 1Password item, next to the break-glass age identity. Webhook secrets
+      live in each server's item instead
 - [ ] Apply the staging server with OpenTofu (X3). Confirm its repository webhooks exist in each hosted repository, and that the webhook
       secret has reached 1Password and the server's `secrets.age`, as decided in #B3
 - [ ] Record the `app_id` in the ansible repository's group vars (X2), not in this repository
@@ -39,4 +40,4 @@ Blocked by #B3, #F1, X3 (specsnl/specsops-opentofu)
 
 ## Done when
 
-The App and the staging webhook exist, both secrets are in 1Password, and the runbook matches reality.
+The App and the staging webhook exist, the App key and the staging server's item are in 1Password, and the runbook matches reality.

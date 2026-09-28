@@ -449,21 +449,42 @@ config, or after a crash. Fetching them from 1Password with a service account at
 - It needs **the service-account token on disk**, which just moves the problem one level down.
 - It adds the `op` CLI and a rate-limited API to every server.
 
-1Password belongs on the **authoring side**. It is the source of truth for the GitHub App private key and for
-a **break-glass age identity**, whose recipient is included in every `secrets.age`. That way a person can
-always decrypt, inspect and re-encrypt the file.
+1Password belongs on the **authoring side**, as the source of truth for every secret. The daemon itself never talks to it:
+
+| 1Password item          | Holds                                                                                                                                                    |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| One item **per server** | That server's webhook secret (two entries while a rotation is under way), and possibly its host age identity (spike B1)                                  |
+| The GitHub App          | The App's private key, shared by every server                                                                                                            |
+| Break-glass             | The team's break-glass age identity, whose recipient is included in every `secrets.age`, so a person can always decrypt, inspect and re-encrypt the file |
+
+The server never holds 1Password credentials. `secrets.age` is assembled and encrypted **where 1Password is
+reachable**, and only the ciphertext travels to the server.
 
 ### Recipients and authoring
 
-Every `secrets.age` is encrypted to at least two recipients: the host's identity and the team's break-glass
-recipient. Authoring uses the upstream `age` CLI, and the daemon ships no encrypt command:
+A server's `secrets.age` combines its own 1Password item with the shared App key, encrypted to at least two
+recipients: the host's identity and the team's break-glass recipient. Authoring uses the upstream `age` CLI, and the
+daemon ships no encrypt command. Done by hand, it looks like this, with the plaintext never touching the disk (the vault and item
+names are illustrative):
 
 ```sh
-age --encrypt --armor \
-    --recipient "$(cat hosts/web-1.age.pub)" \
-    --recipient "$(cat team/break-glass.age.pub)" \
-    --output hosts/web-1/secrets.age secrets.json
+jq -n --arg webhook "$(op read 'op://Specsops/specsdeployd web-1/webhook_secret')" \
+      --arg key "$(op read 'op://Specsops/specsdeployd GitHub App/private_key')" \
+      '{schema: 1, webhook_secrets: [$webhook], github_app_private_key: $key}' |
+  age --encrypt --armor \
+      --recipient "$(cat hosts/web-1.age.pub)" \
+      --recipient "$(cat team/break-glass.age.pub)" \
+      --output hosts/web-1/secrets.age
 ```
+
+The same steps can be automated in one of two ways, and spike B3 picks one:
+
+- **OpenTofu**, when it creates the server. It reads the item with the 1Password provider, which it needs anyway for the
+  webhook's secret.
+- **An Ansible playbook run off-host,** from a workstation or CI that can reach 1Password, using the `community.general.onepassword` lookup.
+
+Either way, the output is the ciphertext committed to specsops-ansible, and ansible-pull copies it into place. Rotating a secret
+does not require touching the server. A playbook that pushes over SSH would conflict with "no CI SSH" (§1), so it is not an option.
 
 Rotation, re-keying a host, and adding a host are runbook pages (G3).
 
@@ -526,8 +547,9 @@ the server's DNS name and its webhook secret. The mapping from environments to s
 and a new server or a moved environment gets its webhooks in the same change. The daemon never creates or changes a
 webhook. It only needs its own `config.json` to agree with what OpenTofu declared.
 
-Spike B3 confirms the delivery details (headers, redeliveries, retries) and settles where the per-server secret
-originates, so that OpenTofu, `secrets.age` and 1Password all hold the same value.
+The webhook secret lives in the server's 1Password item. OpenTofu reads it from there to configure the webhooks, and
+the same value is encrypted into the server's `secrets.age`; see [Recipients and authoring](#recipients-and-authoring).
+Spike B3 confirms the delivery details (headers, redeliveries, retries) and picks who assembles `secrets.age`.
 
 ### Request pipeline
 
@@ -964,8 +986,8 @@ the receiver and deploy epics. Only the status reporter (F2) waits for the pipel
 ## Open questions
 
 1. **The host identity source.** Resolved by spike B1.
-2. **The webhook secret's origin.** OpenTofu generates it (so it ends up in state), or it lives in 1Password and
-   OpenTofu reads it, and how it reaches `secrets.age`. Resolved by spike B3.
+2. **Who assembles `secrets.age`** from the server's 1Password item: OpenTofu at creation, or an Ansible playbook run
+   off-host. The source is decided (1Password, one item per server). Resolved by spike B3.
 3. **Pulling private GHCR images.** root's `/etc/containers/auth.json`, laid down by ansible-pull, or a
    token with `packages: read` minted by the App. `sudo` resets the environment, so `REGISTRY_AUTH_FILE`
    cannot be passed through. Resolved by spike B4.
