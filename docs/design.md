@@ -488,18 +488,46 @@ At startup, the daemon refuses an identity file that is group- or world-readable
 
 ### Topology (spike B3)
 
-Every server must receive every deployment event and decide for itself whether it hosts the environment. That shapes how webhooks are delivered:
+A GitHub environment has no webhook of its own. The `deployment` event belongs to the **repository**. It can be delivered by
+a repository webhook, an organization webhook, or a GitHub App's webhook, and each of those limits how delivery can work:
 
-- **A GitHub App has exactly one webhook URL.** It cannot fan out to several servers, so the App is used
-  **only for reporting statuses**.
-- **Delivery uses one org webhook per server**, subscribed to the `deployment` event only, with content type
-  `application/json` and a per-server secret. It points at that server's hostname, for example
-  `https://deploy.web-1.specs.dev/hook/github`. The single `deploy.specs.dev` name in architecture §8 works
-  only while there is one app server.
-- GitHub allows up to 20 webhooks per event per organisation. That is the ceiling on app servers before this
-  approach needs a relay, and it is comfortably above the Phase 1 scale.
+| Kind                 | Receives events from                     | Limit (GitHub docs)               |
+|----------------------|------------------------------------------|-----------------------------------|
+| Repository webhook   | that one repository                      | 20 per event type, per repository |
+| Organization webhook | every repository in the org              | 20 per event type, per org        |
+| GitHub App webhook   | every repository the App is installed on | exactly **one** URL per App       |
 
-Spike B3 confirms these points, and whether repository-level webhooks would be better than org-level ones.
+**The decision: one repository webhook per (repository, server) pair.** Each app repository has one webhook for each
+server that hosts at least one of its environments, and that webhook points at the server's own hostname:
+
+| Hosting                                  | Webhooks                     |
+|------------------------------------------|------------------------------|
+| Repo A: `main` and `test` both on web-1  | A → `deploy.web-1.specs.dev` |
+| Repo A: `main` on web-1, `test` on web-2 | A → web-1, A → web-2         |
+| Repo B, also on web-1                    | also B → web-1               |
+
+- **The number of projects is unlimited.** The cap of 20 is on servers per repository, far more than any app's set of stages
+  needs. An org webhook for each server would instead cap the whole fleet at 20 servers, and send every server every
+  deployment in the org.
+- **Servers still route.** A repository webhook fires for every environment of that repository. In the second row, web-1 also
+  receives `A/test`, answers step 9 with `202 ignored`, and posts nothing, because web-2 owns it.
+- **One secret per server.** Every repository webhook that targets a server signs with that server's secret, so the
+  server's `secrets.age` stays the same however many repositories it hosts.
+- **Content type** is `application/json`, and the only event is `deployment`.
+- **The App is not used for delivery.** Its single URL cannot fan out to several servers, and its webhook stays
+  disabled. It exists only to **report statuses**; see [Authentication](#authentication).
+- **No central relay.** Pointing one App or org webhook at a relay that forwards to the right server would remove every
+  limit, but the relay would be a single point of failure for every deploy. It is rejected.
+
+**The webhooks are infrastructure as code, not a daemon feature.** Each server is created by OpenTofu
+(`specsops-opentofu`), and the same apply creates the server's webhooks. For every environment the server hosts, it
+creates a `github_repository_webhook` (from the `integrations/github` provider) in that environment's repository, plus
+the server's DNS name and its webhook secret. The mapping from environments to servers then has one source of truth,
+and a new server or a moved environment gets its webhooks in the same change. The daemon never creates or changes a
+webhook. It only needs its own `config.json` to agree with what OpenTofu declared.
+
+Spike B3 confirms the delivery details (headers, redeliveries, retries) and settles where the per-server secret
+originates, so that OpenTofu, `secrets.age` and 1Password all hold the same value.
 
 ### Request pipeline
 
@@ -879,10 +907,11 @@ This repository ships only the binary. The work below lives in other repositorie
 
 | Repository                    | Change                                                                                                                                                                                                                                                                                                                      |
 |-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `specsops-golden-images`      | Amend architecture §8 (a webhook per server), §9 (sudoers and `in_progress`), §11 (local refs), §12.3 (as above), and add §12.4                                                                                                                                                                                             |
+| `specsops-golden-images`      | Amend architecture §8 (one repository webhook per repository and server, a hostname per server), §9 (sudoers and `in_progress`), §11 (local refs), §12.3 (as above), and add §12.4                                                                                                                                          |
 | `specsops-ansible-collection` | sudoers: add `/usr/bin/podman tag *`; unit: `TimeoutStopSec`, plus `LoadCredential` if B1 chooses the SSH host key; config directory ownership `root:specsdeployd` so the daemon cannot rewrite its own config; molecule: the unit starts and stays up with a fixture config; release `0.4.0`                               |
 | `specsops-ansible`            | The Caddy site `deploy.<server>.specs.dev`, which proxies **only** `/hook/github`; the Quadlet template with `Image=localhost/<unit>:deployed` and `Pull=never`; the `config.json` template with `validate: specsdeployd config validate %s`; delivery of `secrets.age`; the host identity (per B1); `specsdeployd_version` |
-| GitHub org (manual, runbook)  | Create the GitHub App and install it; one org webhook per server; registry credentials for root, per spike B4                                                                                                                                                                                                               |
+| `specsops-opentofu`           | For each server: its VM, the DNS name `deploy.<server>.specs.dev`, its webhook secret, and one `github_repository_webhook` per repository it hosts an environment of (spike B3)                                                                                                                                             |
+| GitHub org (manual, runbook)  | Create the GitHub App (webhook disabled) and install it; registry credentials for root, per spike B4                                                                                                                                                                                                                        |
 
 ---
 
@@ -914,7 +943,7 @@ depends on has merged.
 | Wave | Available in parallel                                                                                                                   |
 |------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | 1    | AGENTS.md (A1), docs site (A2), rulesets and CI (A3), sentinels (A4), chores (A6), release contract tests (A7), all four spikes (B1–B4) |
-| 2    | App spine (A5), schemas (C1), runner (E1), probe (E2), collection role change (X1)                                                      |
+| 2    | App spine (A5), schemas (C1), runner (E1), probe (E2), collection role change (X1), OpenTofu servers and webhooks (X3)                  |
 | 3    | Config (C2), secrets (C4), architecture amendment (C3)                                                                                  |
 | 4    | Event (C6), `config validate` (C5), `serve` (D1), HMAC (D2), GitHub client (F1)                                                         |
 | 5    | Request pipeline (D3), queue (D4), deploy executor (E3), GitHub setup (G5), ansible-pull changes (X2)                                   |
@@ -926,7 +955,7 @@ depends on has merged.
 | 11   | Acceptance on a golden-app VM, then `v0.2.0` (G6)                                                                                       |
 
 The spikes are the ones to start straight away. They need no code, they can all run in parallel, and each of
-them gates a contract: B1 the identity path, B2 the Quadlet template and the sudoers line, B3 the webhook setup,
+them gates a contract: B1 the identity path, B2 the Quadlet template and the sudoers line, B3 the webhooks and their secret,
 and B4 pulling private images.
 
 The GitHub client (F1) depends only on the foundation and on the config and secrets types, so it can run in parallel with
@@ -935,8 +964,8 @@ the receiver and deploy epics. Only the status reporter (F2) waits for the pipel
 ## Open questions
 
 1. **The host identity source.** Resolved by spike B1.
-2. **Webhook topology and hostnames.** A webhook per server at `deploy.<server>.specs.dev`, or a
-   relay? Resolved by spike B3.
+2. **The webhook secret's origin.** OpenTofu generates it (so it ends up in state), or it lives in 1Password and
+   OpenTofu reads it, and how it reaches `secrets.age`. Resolved by spike B3.
 3. **Pulling private GHCR images.** root's `/etc/containers/auth.json`, laid down by ansible-pull, or a
    token with `packages: read` minted by the App. `sudo` resets the environment, so `REGISTRY_AUTH_FILE`
    cannot be passed through. Resolved by spike B4.

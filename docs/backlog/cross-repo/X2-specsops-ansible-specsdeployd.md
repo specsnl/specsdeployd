@@ -17,7 +17,7 @@ Nothing in this list exists yet, and specsdeployd v0.2.0 cannot run without it.
 
 ## Scope
 
-- [ ] **Caddy:** a site for the server's hostname (per spike B3, for example `deploy.web-1.specs.dev`) that proxies **only**
+- [ ] **Caddy:** a site for the server's hostname (`deploy.<server>.specs.dev`, the DNS name X3 creates) that proxies **only**
       `POST /hook/github` to `127.0.0.1:9000`, with `request_body max_size 1MB`. Every other path gets `404`
 - [ ] **Quadlet:** the `app-<app>-<stage>.container` template uses `Image=localhost/app-<app>-<stage>:deployed` and
       `Pull=never`, exactly as spike B2 wrote it
@@ -31,6 +31,6 @@ Nothing in this list exists yet, and specsdeployd v0.2.0 cannot run without it.
 
 ## Verify
 
-- [ ] A `ping` from the server's GitHub webhook gets `200 pong`
+- [ ] A `ping` from one of the server's repository webhooks (created by X3) gets `200 pong`
 - [ ] Breaking `config.json` on purpose makes the ansible-pull run fail at `validate`, and the old file stays in place
 - [ ] `curl https://deploy.<server>.specs.dev/livez` gets `404` from Caddy, not `200`: loopback-only health routes stay loopback-only

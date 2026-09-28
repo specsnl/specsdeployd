@@ -30,7 +30,7 @@ never seen the daemon before: how to put it on a server, configure it, author it
       - the 1Password location of the break-glass identity and the App key;
       - rotating a webhook secret with no downtime, using the two-secret window;
       - rotating a host identity
-- [ ] `usage/github-setup.md`: the permissions of the GitHub App, installing it, and one webhook per server, as decided in #B3
+- [ ] `usage/github-setup.md`: the permissions of the GitHub App, installing it, and the repository webhooks OpenTofu creates for each server (X3), as decided in #B3
 - [ ] `usage/commands.md`: `serve`, `config validate`, `deploy`, `version`
 - [ ] `usage/runbook.md`, covering:
       - using `journalctl -u specsdeployd` with the standard log keys;

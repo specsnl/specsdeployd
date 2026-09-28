@@ -16,7 +16,7 @@ is incomplete in ways that only showed up while designing the daemon:
 - there are no secrets anywhere;
 - a tag deploy cannot switch the image;
 - environments are not bound to a repository or an image;
-- one webhook hostname cannot serve several servers.
+- one webhook hostname cannot serve several servers, and an environment has no webhook of its own.
 
 Open a PR there that brings it in line with `docs/design.md`, so both documents say the same thing again. The PR lives in
 specsops-golden-images; this issue tracks it.
@@ -28,7 +28,7 @@ specsops-golden-images; this issue tracks it.
 
 ## Scope
 
-- [ ] §8: the webhook per server and its hostname, as decided in #B3
+- [ ] §8: one repository webhook per (repository, server) pair, created by OpenTofu, and one hostname per server, as decided in #B3
 - [ ] §9:
       - the added sudoers line, as decided in #B2;
       - `in_progress`, `inactive` and `error` added to the reported states;

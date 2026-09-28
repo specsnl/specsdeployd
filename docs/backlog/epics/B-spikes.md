@@ -10,7 +10,7 @@ Four questions that code cannot settle, and that each gate a contract:
 
 - **B1**, the host age identity, gates the default `identity_file` path and possibly a unit change;
 - **B2**, retagging under Quadlet, gates the Quadlet template and the `podman tag` sudoers line;
-- **B3**, the webhook topology, gates the hostnames and how the webhooks are set up;
+- **B3**, repository webhooks created by OpenTofu, gates the hostnames, the webhook module and where the secret comes from;
 - **B4**, pulling private GHCR images, gates the registry credentials on hosts.
 
 Each spike ends with a comment on its issue recording what was observed, and an update to `docs/design.md`,

@@ -4,7 +4,7 @@ title: "acceptance: a GitHub deployment rolls a golden-app VM forward, then cut 
 type: Task
 milestone: "M5 · Ship"
 epic: G
-depends_on: [G4, G5, X1, X2]
+depends_on: [G4, G5, X1, X2, X3]
 repo: specsnl/specsdeployd
 ---
 
@@ -29,6 +29,7 @@ Once that holds, cut `v0.2.0` and pin it from ansible-pull.
       tag is running
 - [ ] A `branch` deployment of `main` ends in `success`
 - [ ] A deliberately broken image ends in `failure` with "rolled back", and the previous version is still serving
+- [ ] Server creation, webhooks included, came from one `tofu apply` (X3), with no webhook clicked by hand
 - [ ] A deployment for an environment on another server is ignored, and no status appears from this server
 - [ ] Restart the VM: the unit comes back with the last deployed image, without any deploy
 - [ ] Tag `v0.2.0`, point `specsdeployd_version` at it, and update specsops#13's "Where it stands"
@@ -39,7 +40,7 @@ The checks above, each recorded with a link to its deployment in a comment on th
 
 ## Depends on
 
-Blocked by #G4, #G5, X1 (specsnl/specsops-ansible-collection), X2 (specsnl/specsops-ansible)
+Blocked by #G4, #G5, X1 (specsnl/specsops-ansible-collection), X2 (specsnl/specsops-ansible), X3 (specsnl/specsops-opentofu)
 
 ## Done when
 

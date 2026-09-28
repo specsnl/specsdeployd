@@ -41,16 +41,16 @@ In the bodies, `#A4`-style references are placeholders. Creation rewrites them t
 
 ## Index
 
-| Epic                          | Issues                                 |
-|-------------------------------|----------------------------------------|
-| A — Foundation & repo hygiene | A1–A7                                  |
-| B — Spikes                    | B1–B4                                  |
-| C — Contracts                 | C1–C6                                  |
-| D — Webhook receiver          | D1–D4                                  |
-| E — Deploy pipeline           | E1–E5                                  |
-| F — GitHub reporting          | F1–F2                                  |
-| G — Ship                      | G1–G6                                  |
-| Cross-repo                    | X1 (collection), X2 (specsops-ansible) |
+| Epic                          | Issues                                                         |
+|-------------------------------|----------------------------------------------------------------|
+| A — Foundation & repo hygiene | A1–A7                                                          |
+| B — Spikes                    | B1–B4                                                          |
+| C — Contracts                 | C1–C6                                                          |
+| D — Webhook receiver          | D1–D4                                                          |
+| E — Deploy pipeline           | E1–E5                                                          |
+| F — GitHub reporting          | F1–F2                                                          |
+| G — Ship                      | G1–G6                                                          |
+| Cross-repo                    | X1 (collection), X2 (specsops-ansible), X3 (specsops-opentofu) |
 
 ## Creating the tracker
 
@@ -63,4 +63,4 @@ This happens only after the drafts have been reviewed.
 - [ ] Rewrite the `#<id>` placeholders in every body into real numbers
 - [ ] Update the "Where it stands" section of specsops#13
 - [ ] Record the numbers in `docs/design.md` § Milestones, then delete `docs/backlog/`
-- [ ] Separately, once confirmed: create X1 and X2 in their repositories and link them from G6
+- [ ] Separately, once confirmed: create X1, X2 and X3 in their repositories and link them from G6
